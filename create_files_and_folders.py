@@ -21,20 +21,16 @@ The purpose of this is to set up the initial folders and files for a collaborati
 under the guidance of Professor Mik Fanguy of KAIST university of Daejeon, South Korea.
 
 Example of files and folder creation.
-https://drive.google.com/drive/folders/15-9eieDl5aicGLEclj1qShdOWvP6pwvv?usp=sharing
+https://drive.google.com/drive/folders/1iRQVclSh7JNxyvgqoO5Sw1s1T6UWhrj5?usp=sharing
 
 Example of the templates.
 https://drive.google.com/drive/folders/1z92dOmC0M_jkMv6651mtRQoGS3ABHy2Y?usp=sharing
 
 You'll need to download the 'credentials.json' from your Google account.
-
 """
-
-
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/documents']
-
 
 # Get permission via web browser.
 gauth = GoogleAuth()
@@ -182,18 +178,29 @@ def create_folders():
 
                 try:
                     drive_service_v3.files().copy(fileId=id, body=body).execute()
-
                 except:
                     pass
+
         section_group_permission['groups'] = group_dict
         permission_list.append(section_group_permission)
 
     Label(root, text='Folders and Files Created').grid(row=6, column=1)
 
 
+def callback(request_id, response, exception):
+    if exception:
+        print(exception)
+    else:
+        print("Permission ID:", response.get('id'))
+
+
+batch = drive_service_v3.new_batch_http_request(callback=callback)
+
+
 def grant_permission():
     global permission_list
     csv_filename = permission_filename_entry.get()
+
     with open(csv_filename, 'r') as file:
         reader = csv.reader(file)
         for idx, csv_row in enumerate(reader):
@@ -201,13 +208,23 @@ def grant_permission():
             if idx == 0:
                 continue
 
-            for permission_row in permission_list:
-                # csv column order: gmail, section, group_number
-                if csv_row[1] == permission_row['section']:
-                    print(permission_row['groups'])
-                    # print(permission_row['groups'][0])
-                    # if csv_row[2] in permission_row['groups'][0]:
-                    #     print('Yes')
+            for i in range(len(permission_list)):
+                # Check section and group name.
+                if csv_row[1] == permission_list[i]['section'] and csv_row[2] in permission_list[i]['groups']:
+                    print(permission_list[i]['groups'])
+                    print('\t', 'Send permission to: ' + csv_row[0], permission_list[i]['groups'][csv_row[2]])
+                    # Gives permission to a user.
+                    user_permission = {
+                        'type': 'user',
+                        'role': 'writer',
+                        'emailAddress': csv_row[0]
+                    }
+                    batch.add(drive_service_v3.permissions().create(
+                        fileId=permission_list[i]['groups'][csv_row[2]],
+                        body=user_permission,
+                        fields='id'
+                    ))
+                    batch.execute()
 
 
 # UI
